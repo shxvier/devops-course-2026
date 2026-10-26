@@ -1,0 +1,8 @@
+# использование (под student): bash ~/lab/run d01   -> выполнить от имени devops
+#                              bash ~/lab/run s08   -> выполнить от имени student
+git -C ~/lab pull -q 2>/dev/null
+f=$(ls ~/lab/pr7/$1* 2>/dev/null | head -1)
+case $1 in
+  d*) sudo -iu devops bash -c "git -C ~/lab pull -q 2>/dev/null; bash ~/lab/pr7/$(basename $f)";;
+  *)  bash "$f";;
+esac
