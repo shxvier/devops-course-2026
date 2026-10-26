@@ -175,6 +175,80 @@ hostname -f                         # devops-vm.devops.local
 | `01-clean-install` | 03:39 | ОС установлена, `apt upgrade`, VM выключена |
 | `02-keys-configured` | 04:01 | `devops` в sudo, ключ ed25519, `~/.ssh/config` |
 | `03-ssh-hardened` | 04:40 | `99-hardening.conf`, порт 2222, `ssh.socket` отключён, проброс 2222→2222 |
+| `04-nginx-https` | 26.10.2026 14:19 | Nginx, ресурс devops-site, самоподписанный сертификат, HTTP → HTTPS |
+
+## 8. Веб-сервер
+
+- Пакеты: `nginx` 1.28.3 и `rsync` из репозитория Ubuntu: `sudo apt update && sudo apt install -y nginx rsync`.
+- Конфигурация ресурса: `/etc/nginx/sites-available/devops-site` (источник — `configs/nginx/devops-site` в репозитории; HTTP-вариант первого этапа — `configs/nginx/devops-site.http`), символическая ссылка в `/etc/nginx/sites-enabled/devops-site`. Ссылка `sites-enabled/default` удалена, файл `sites-available/default` сохранён.
+- Каталог ресурса: `/var/www/devops-site`, владелец `devops:devops`, каталоги `755`, файлы `644`. Права приводятся при каждой доставке: `rsync --chmod=D755,F644` (`scripts/deploy.sh`).
+- Сертификат: `/etc/ssl/certs/devops.crt`, `644 root:root`. Закрытый ключ: `/etc/ssl/private/devops.key`, `600 root:root` (читает только master-процесс nginx от root).
+- Сертификат самоподписанный, RSA 2048, `CN=devops.local`, SAN `DNS:devops.local`, срок 365 дней (26.10.2026 — 26.10.2027).
+- Журналы: `/var/log/nginx/devops-site.access.log`, `/var/log/nginx/devops-site.error.log`. HSTS не включается.
+
+```bash
+# [VM] каталог ресурса
+sudo mkdir -p /var/www/devops-site
+sudo chown -R devops:devops /var/www/devops-site
+
+# [VM] сертификат
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/private/devops.key -out /etc/ssl/certs/devops.crt \
+  -subj "/CN=devops.local" -addext "subjectAltName=DNS:devops.local"
+
+# [VM] конфигурация (репозиторий склонирован в ~/repo, ветка с конфигами)
+sudo cp ~/repo/configs/nginx/devops-site /etc/nginx/sites-available/devops-site
+sudo ln -s /etc/nginx/sites-available/devops-site /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Итоговый `/etc/nginx/sites-available/devops-site`:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name devops.local;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name devops.local;
+
+    ssl_certificate     /etc/ssl/certs/devops.crt;
+    ssl_certificate_key /etc/ssl/private/devops.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    root /var/www/devops-site;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    error_page 404 /404.html;
+
+    access_log /var/log/nginx/devops-site.access.log;
+    error_log  /var/log/nginx/devops-site.error.log;
+}
+```
+
+```bash
+# [Хост, WSL 1] окружение для доставки (один раз)
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+cp /mnt/c/Users/Alexey/.ssh/devops_vm ~/.ssh/
+tr -d '\r' < /mnt/c/Users/Alexey/.ssh/config > ~/.ssh/config   # убрать CRLF
+chmod 600 ~/.ssh/devops_vm ~/.ssh/config
+sudo apt install -y rsync git
+git clone https://github.com/shxvier/devops-course-2026 ~/devops-course-2026   # не на /mnt/c
+
+# [Хост, WSL 1] доверие сертификату и доставка
+scp devops:/etc/ssl/certs/devops.crt ~/devops.crt
+scripts/deploy.sh            # или scripts/deploy.sh --dry-run
+```
 
 ## Контроль
 
