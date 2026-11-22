@@ -270,8 +270,8 @@ scripts/deploy.sh            # или scripts/deploy.sh --dry-run
 - `app` загружает образ, запускает контейнер и проверяет HTTP.
 
 Образ — `ghcr.io/shxvier/devops-ci-app`. Используется полный SHA зелёного
-коммита из публикации ПР 10. Передайте его в `DEVOPS_APP_SHA` или
-зафиксируйте фактический тег в `ansible/group_vars/all.yml`. Для скачивания
+коммита из публикации ПР 10. Проверенный тег по умолчанию —
+`d6b2eb9c298642b8d98dea8425167c82403ebc74`. Для другого опубликованного коммита задайте `DEVOPS_APP_SHA`. Для скачивания
 образа пакет должен быть публичным либо на VM должен быть настроен доступ
 на чтение. Внутренний порт 5000 опубликован на `127.0.0.1:5000`.
 Внешняя проверка идёт через Nginx по пути `/health` и ожидает
@@ -281,8 +281,6 @@ HTTP 200 с JSON `{"status":"ok"}`.
 cd ansible
 ansible-galaxy collection install -r requirements.yml
 ssh-keygen -t ed25519 -f ~/.ssh/devops_vm
-read -r -p 'Полный SHA публикации GHCR: ' DEVOPS_APP_SHA
-export DEVOPS_APP_SHA
 ansible-inventory -i inventory/bootstrap.ini --graph
 ansible-inventory --graph
 ansible-playbook -i inventory/bootstrap.ini site.yml --syntax-check

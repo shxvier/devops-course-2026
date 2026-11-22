@@ -1,6 +1,6 @@
 ---
 app_image: ghcr.io/shxvier/devops-ci-app
-app_tag: "{{ lookup('ansible.builtin.env', 'DEVOPS_APP_SHA') }}"
+app_tag: "{{ lookup('ansible.builtin.env', 'DEVOPS_APP_SHA') | default('d6b2eb9c298642b8d98dea8425167c82403ebc74', true) }}"
 app_container_name: devops-ci-app
 app_host_port: 5000
 app_internal_port: 5000
