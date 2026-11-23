@@ -253,3 +253,44 @@ scripts/deploy.sh            # или scripts/deploy.sh --dry-run
 ## Контроль
 
 `bash ~/repo/scripts/audit.sh; echo $?` на сервере — `0`.
+
+## 10. Ansible
+
+Проект находится в `ansible/` репозитория `devops-course-2026`. Управляющий
+узел работает с Ansible по SSH. Управляемый узел — Ubuntu Server 24.04 amd64
+с Python 3 и сетью Host-only. Учебный адрес в inventory — `192.168.56.101`.
+Перед первым запуском укажите фактический IP в обоих inventory и проверьте
+отпечаток SSH-хоста через консоль VM.
+
+- `inventory/bootstrap.ini` — первичный вход как `student` с sudo.
+- `inventory/prod.ini` — вход по ключу как `devops` и sudo без пароля.
+- `base` устанавливает системные пакеты и Docker из официального репозитория.
+- `ssh` добавляет открытый ключ, проверяет конфигурацию и настраивает UFW.
+- `nginx` публикует reverse proxy на :80.
+- `app` загружает образ, запускает контейнер и проверяет HTTP.
+
+Образ — `ghcr.io/shxvier/devops-ci-app`. Используется полный SHA зелёного
+коммита из публикации ПР 10. Проверенный тег по умолчанию —
+`d6b2eb9c298642b8d98dea8425167c82403ebc74`. Для другого опубликованного коммита задайте `DEVOPS_APP_SHA`. Для скачивания
+образа пакет должен быть публичным либо на VM должен быть настроен доступ
+на чтение. Внутренний порт 5000 опубликован на `127.0.0.1:5000`.
+Внешняя проверка идёт через Nginx по пути `/health` и ожидает
+HTTP 200 с JSON `{"status":"ok"}`.
+
+```bash
+cd ansible
+ansible-galaxy collection install -r requirements.yml
+ssh-keygen -t ed25519 -f ~/.ssh/devops_vm
+ansible-inventory -i inventory/bootstrap.ini --graph
+ansible-inventory --graph
+ansible-playbook -i inventory/bootstrap.ini site.yml --syntax-check
+ansible-playbook site.yml --syntax-check
+ansible-playbook -i inventory/bootstrap.ini site.yml --ask-pass --ask-become-pass
+ansible all -m ping
+ansible-playbook site.yml
+ansible-playbook verify.yml
+```
+
+Создавайте ключ только при его отсутствии. Для bootstrap по паролю на
+управляющем узле нужен `sshpass`. Если ключ уже установлен пользователю
+`student`, добавьте его путь в bootstrap inventory и опустите `--ask-pass`.

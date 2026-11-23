@@ -1,0 +1,16 @@
+---
+- name: Configure and deploy devops VM
+  hosts: vm
+  become: true
+  pre_tasks:
+    - name: Require a full commit SHA before configuring the VM
+      ansible.builtin.assert:
+        that:
+          - app_tag is match('^[0-9a-f]{40}$')
+        fail_msg: Set DEVOPS_APP_SHA to the full SHA of the image published in GHCR.
+
+  roles:
+    - base
+    - ssh
+    - nginx
+    - app
